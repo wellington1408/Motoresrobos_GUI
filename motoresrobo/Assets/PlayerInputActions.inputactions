@@ -19,28 +19,6 @@
             ],
             "bindings": [
                 {
-                    "name": "",
-                    "id": "4c0325f6-70d0-4df5-838d-72f194b0efc2",
-                    "path": "",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";tecladop1",
-                    "action": "Move",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
-                    "id": "c2b8dea0-47e8-4ab1-8fee-dc38754ec26f",
-                    "path": "",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": ";tecladop2",
-                    "action": "Move",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
                     "name": "2D Vector",
                     "id": "2c336c06-22e4-4c90-933a-843a0ea4a353",
                     "path": "2DVector",
