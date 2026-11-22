@@ -1,26 +1,33 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
     [Header("Identificação")]
-    [Tooltip("1 para Jogador 1 (WASD), 2 para Jogador 2 (Setas)")]
-    public int playerID = 1; 
+    [Tooltip("1 = Jogador 1 (WASD / tecladop1), 2 = Jogador 2 (Setas / tecladop2)")]
+    public int playerID = 1;
 
     [Header("Movimento")]
     public float moveSpeed = 5f;
     public float rotationSpeed = 720f;
+    public float gravity = -9.81f;
 
-    [Header("Câmera")]
+    [Header("Câmera (opcional se usar PlayerFollowCmra)")]
     public Camera playerCamera;
-    public Vector3 cameraOffset = new Vector3(0, 3f, -4f);
+    public bool controlCameraManually = false;
+    public Vector3 cameraOffset = new Vector3(0f, 3f, -4f);
     public float cameraSmoothSpeed = 10f;
 
     private CharacterController controller;
+    private PlayerInput playerInput;
+    private Vector2 moveInput;
+    private float verticalVelocity;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+        playerInput = GetComponent<PlayerInput>();
     }
 
     private void OnEnable()
@@ -33,56 +40,100 @@ public class PlayerController : MonoBehaviour
         GameEvents.OnCoinCollected -= HandleCoinCollected;
     }
 
+    private void Start()
+    {
+        ConfigureCameraViewport();
+        ConfigureInputScheme();
+    }
+
+    private void ConfigureCameraViewport()
+    {
+        if (playerCamera == null) return;
+
+        if (playerID == 1)
+        {
+            playerCamera.rect = new Rect(0f, 0f, 0.5f, 1f);
+        }
+        else if (playerID == 2)
+        {
+            playerCamera.rect = new Rect(0.5f, 0f, 0.5f, 1f);
+        }
+    }
+
+    private void ConfigureInputScheme()
+    {
+        if (playerInput == null) return;
+
+        string targetScheme = playerID == 1 ? "tecladop1" : "tecladop2";
+
+        if (playerInput.actions != null)
+        {
+            playerInput.actions.Enable();
+        }
+
+        if (!string.IsNullOrEmpty(targetScheme) && playerInput.currentControlScheme != targetScheme)
+        {
+            playerInput.SwitchCurrentControlScheme(targetScheme, Keyboard.current);
+        }
+    }
+
+
+    public void OnMove(InputValue value)
+    {
+        moveInput = value.Get<Vector2>();
+    }
+
     private void Update()
     {
-        MovePlayer();
+        Move();
     }
 
     private void LateUpdate()
     {
-        UpdateCamera();
+        if (controlCameraManually)
+        {
+            UpdateCamera();
+        }
     }
 
-    private void MovePlayer()
+    private void Move()
     {
-        float moveX = 0f;
-        float moveZ = 0f;
+        Transform refTransform = playerCamera != null ? playerCamera.transform : transform;
 
-        
-        if (playerID == 1)
-        {
-            if (Input.GetKey(KeyCode.W)) moveZ = 1f;
-            if (Input.GetKey(KeyCode.S)) moveZ = -1f;
-            if (Input.GetKey(KeyCode.A)) moveX = -1f;
-            if (Input.GetKey(KeyCode.D)) moveX = 1f;
-        }
-        else if (playerID == 2)
-        {
-            if (Input.GetKey(KeyCode.UpArrow)) moveZ = 1f;
-            if (Input.GetKey(KeyCode.DownArrow)) moveZ = -1f;
-            if (Input.GetKey(KeyCode.LeftArrow)) moveX = -1f;
-            if (Input.GetKey(KeyCode.RightArrow)) moveX = 1f;
-        }
-
-        Vector3 forward = playerCamera != null ? playerCamera.transform.forward : Vector3.forward;
-        Vector3 right = playerCamera != null ? playerCamera.transform.right : Vector3.right;
-
+        Vector3 forward = refTransform.forward;
+        Vector3 right = refTransform.right;
         forward.y = 0f;
         right.y = 0f;
         forward.Normalize();
         right.Normalize();
 
-        Vector3 moveDir = (forward * moveZ + right * moveX).normalized;
-
-        if (moveDir.magnitude >= 0.1f)
+        Vector3 moveDir = forward * moveInput.y + right * moveInput.x;
+        if (moveDir.sqrMagnitude > 1f)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(moveDir);
-            transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-
-            controller.Move(moveDir * moveSpeed * Time.deltaTime);
+            moveDir.Normalize();
         }
 
-        controller.Move(Vector3.down * 9.81f * Time.deltaTime);
+        if (moveDir.sqrMagnitude > 0.001f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(moveDir);
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                targetRotation,
+                rotationSpeed * Time.deltaTime
+            );
+        }
+
+        if (controller.isGrounded && verticalVelocity < 0f)
+        {
+            verticalVelocity = -2f;
+        }
+        else
+        {
+            verticalVelocity += gravity * Time.deltaTime;
+        }
+
+        Vector3 velocity = moveDir * moveSpeed + Vector3.up * verticalVelocity;
+        controller.Move(velocity * Time.deltaTime);
     }
 
     private void UpdateCamera()
@@ -90,7 +141,11 @@ public class PlayerController : MonoBehaviour
         if (playerCamera == null) return;
 
         Vector3 targetPosition = transform.position + transform.TransformDirection(cameraOffset);
-        playerCamera.transform.position = Vector3.Lerp(playerCamera.transform.position, targetPosition, cameraSmoothSpeed * Time.deltaTime);
+        playerCamera.transform.position = Vector3.Lerp(
+            playerCamera.transform.position,
+            targetPosition,
+            cameraSmoothSpeed * Time.deltaTime
+        );
         playerCamera.transform.LookAt(transform.position + Vector3.up * 1f);
     }
 
